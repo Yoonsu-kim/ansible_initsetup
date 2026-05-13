@@ -1,0 +1,13 @@
+- name: Deploy initial_setup.sh from defaults plus host overrides
+  hosts: initial_setup_targets
+  gather_facts: false
+  vars:
+    initial_setup: "{{ initial_setup_defaults | combine(initial_setup_overrides | default({}), recursive=True) }}"
+
+  tasks:
+    - name: Render initial_setup.sh
+      ansible.builtin.template:
+        src: templates/initial_setup.sh.j2
+        dest: "{{ initial_setup_dest }}"
+        mode: "0755"
+

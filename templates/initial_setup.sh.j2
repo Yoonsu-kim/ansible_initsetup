@@ -1,0 +1,119 @@
+#!/bin/bash
+set -e
+
+#---------------------------------#
+# Runtime pinmux setting for CAN
+{% for pinmux in initial_setup.can_pinmux %}
+busybox devmem {{ pinmux.address }} {{ pinmux.width }} {{ pinmux.value }}
+{% endfor %}
+#---------------------------------#
+
+#---------------------------------#
+# Load kernel modules
+{% for module, enabled in initial_setup.kernel_modules.items() %}
+{% if enabled %}
+modprobe {{ module }}
+{% else %}
+# modprobe {{ module }}
+{% endif %}
+{% endfor %}
+#---------------------------------#
+
+#---------------------------------#
+# CAN interface setup
+{% for name, can in initial_setup.can_interfaces.items() %}
+{% if can.enabled %}
+ip link set {{ name }} up type can bitrate {{ can.bitrate }} sample-point {{ can.sample_point }} sjw {{ can.sjw }}{% if can.fd %} dbitrate {{ can.dbitrate }} dsample-point {{ can.dsample_point }} dsjw {{ can.dsjw }}{% endif %}{% if can.berr_reporting %} berr-reporting on{% endif %} fd {{ 'on' if can.fd else 'off' }} restart-ms {{ can.restart_ms }}
+{% else %}
+# ip link set {{ name }} up type can bitrate {{ can.bitrate }} sample-point {{ can.sample_point }} sjw {{ can.sjw }}{% if can.fd %} dbitrate {{ can.dbitrate }} dsample-point {{ can.dsample_point }} dsjw {{ can.dsjw }}{% endif %}{% if can.berr_reporting %} berr-reporting on{% endif %} fd {{ 'on' if can.fd else 'off' }} restart-ms {{ can.restart_ms }}
+{% endif %}
+{% endfor %}
+#---------------------------------#
+
+#---------------------------------#
+sleep 1
+# Interrupt CPU affinity
+{% for irq, affinity in initial_setup.irq_affinity.items() %}
+{% if affinity.label is defined %}
+# {{ affinity.label }}
+{% endif %}
+{% if affinity.enabled %}
+echo {{ affinity.mask }} > /proc/irq/{{ irq }}/smp_affinity
+{% else %}
+# echo {{ affinity.mask }} > /proc/irq/{{ irq }}/smp_affinity
+{% endif %}
+{% endfor %}
+#---------------------------------#
+
+{% if initial_setup.ethtool.enabled %}
+#---------------------------------#
+# Local network throughput setting
+TARGET_PREFIX="{{ initial_setup.ethtool.target_prefix }}"
+INTERFACE=""
+
+echo "Searching '${TARGET_PREFIX}' IP ..."
+while true; do
+    INTERFACE=$(ip -o addr show | awk -v pat="^$TARGET_PREFIX" '$4 ~ pat {print $2; exit}')
+
+    if [ -n "$INTERFACE" ]; then
+        echo "Success: Interface name is '$INTERFACE'"
+        break
+    fi
+
+    sleep 1
+done
+ethtool -s $INTERFACE speed {{ initial_setup.ethtool.speed }} duplex {{ initial_setup.ethtool.duplex }} autoneg {{ initial_setup.ethtool.autoneg }}
+ethtool -s $INTERFACE advertise {{ initial_setup.ethtool.advertise }}
+#---------------------------------#
+{% endif %}
+
+#---------------------------------#
+# VLAN setting
+export SENSOR_INTERFACE="{{ initial_setup.sensor_interface }}"
+
+while true; do
+  if ip link show "$SENSOR_INTERFACE" | grep -q "state UP"; then
+    echo "$SENSOR_INTERFACE is up"
+    break
+  else
+    echo "Waiting for $SENSOR_INTERFACE"
+    sleep 1
+  fi
+done
+
+{% for vlan_id, vlan in initial_setup.vlans.items() %}
+{% if vlan.enabled %}
+# Up {{ vlan.description | default('VLAN ' ~ vlan_id) }}
+{% if vlan.firewall is defined %}
+{% for rule in vlan.firewall %}
+{{ rule }}
+{% endfor %}
+{% endif %}
+ip link add link $SENSOR_INTERFACE name $SENSOR_INTERFACE.{{ vlan_id }} type vlan id {{ vlan_id }}
+ip addr add {{ vlan.ip }} dev $SENSOR_INTERFACE.{{ vlan_id }}
+ip link set dev $SENSOR_INTERFACE.{{ vlan_id }} up
+{% if vlan.default_gw is defined %}
+ip route add default via {{ vlan.default_gw }} dev $SENSOR_INTERFACE.{{ vlan_id }}
+{% endif %}
+
+{% else %}
+# {{ vlan.description | default('VLAN ' ~ vlan_id) }} disabled
+{% endif %}
+{% endfor %}
+#---------------------------------#
+
+# PTP setting
+{% if initial_setup.ptp.enabled %}
+{% for name, ptp in initial_setup.ptp.configs.items() %}
+{% if ptp.enabled %}
+{{ 'exec ' if initial_setup.ptp.use_exec else '' }}/usr/local/sbin/ptp4l -S -i {{ ptp.interface }} -m -f {{ ptp.config }} > {{ ptp.log }} &
+{% else %}
+# /usr/local/sbin/ptp4l -S -i {{ ptp.interface }} -m -f {{ ptp.config }} > {{ ptp.log }} &
+{% endif %}
+{% endfor %}
+{% else %}
+# PTP disabled
+{% for name, ptp in initial_setup.ptp.configs.items() %}
+# /usr/local/sbin/ptp4l -S -i {{ ptp.interface }} -m -f {{ ptp.config }} > {{ ptp.log }} &
+{% endfor %}
+{% endif %}
