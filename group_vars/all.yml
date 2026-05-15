@@ -1,47 +1,21 @@
 initial_setup_dest: /home/odin/initial_setup.sh
 
 initial_setup_defaults:
-  can_pinmux:
-    - address: "0x0c303018"
-      width: "w"
-      value: "0xc458"
-    - address: "0x0c303010"
-      width: "w"
-      value: "0xc400"
-    - address: "0x0c303008"
-      width: "w"
-      value: "0xc458"
-    - address: "0x0c303000"
-      width: "w"
-      value: "0xc400"
-
-  kernel_modules:
-    can: true
-    can-raw: true
-    mttcan: true
-    "8021q": true
-
   can_interfaces:
     can0:
       enabled: true
-      fd: true
+      fd: false
       bitrate: 500000
       sample_point: "0.8"
       sjw: 3
-      dbitrate: 2000000
-      dsample_point: "0.8"
-      dsjw: 3
       berr_reporting: true
       restart_ms: 100
     can1:
       enabled: true
-      fd: true
+      fd: false 
       bitrate: 500000
       sample_point: "0.8"
       sjw: 3
-      dbitrate: 2000000
-      dsample_point: "0.8"
-      dsjw: 3
       berr_reporting: true
       restart_ms: 100
 
@@ -83,6 +57,14 @@ initial_setup_defaults:
       enabled: true
       description: "Pandar64_1 interface"
       ip: "10.31.1.207/24"
+    "32":
+      enabled: true
+      description: "OT128_0 interface"
+      ip: "10.32.1.207/24"
+    "33":
+      enabled: true
+      description: "OT128_1 interface"
+      ip: "10.33.1.207/24"
     "34":
       enabled: true
       description: "XT32_0 interface"
@@ -120,4 +102,3 @@ initial_setup_defaults:
         interface: "veth0"
         config: "/home/odin/ptp4l_veth0_ars.cfg"
         log: "/var/log/ptp4l_veth0_ars.log"
-

@@ -20,7 +20,7 @@ modprobe 8021q
 #---------------------------------#
 # CAN inteface setup
 # when use can-fd
-ip link set can0 up type can bitrate 500000 sample-point 0.8 sjw 3 dbitrate 2000000 dsample-point 0.8 dsjw 3 berr-reporting on fd on restart-ms 100
+ip link set can0 up type can bitrate 500 sample-point 0.8 sjw 3 dbitrate 2000000 dsample-point 0.8 dsjw 3 berr-reporting on fd on restart-ms 100
 ip link set can1 up type can bitrate 500000 sample-point 0.8 sjw 3 dbitrate 2000000 dsample-point 0.8 dsjw 3 berr-reporting on fd on restart-ms 100
 # when use can
 #ip link set can0 up type can bitrate 500000 sample-point 0.8 sjw 3 berr-reporting on fd off restart-ms 100

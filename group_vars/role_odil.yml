@@ -1,0 +1,17 @@
+# Add only ODIL role-specific differences here.
+initial_setup_overrides: 
+  ptp:
+    enabled: true
+    use_exec: true 
+    configs:
+      hesai:
+        enabled: true
+        interface: "veth0"
+        config: "/home/odin/ptp4l_veth0_hesai.cfg"
+        log: "/var/log/ptp4l_veth0_hesai.log"
+      ars:
+        enabled: true
+        interface: "veth0"
+        config: "/home/odin/ptp4l_veth0_ars.cfg"
+        log: "/var/log/ptp4l_veth0_ars.log"
+

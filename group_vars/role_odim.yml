@@ -1,0 +1,22 @@
+# Add only ODIM role-specific differences here.
+initial_setup_overrides: 
+  vlans:
+    "30":
+      enabled: false
+    "31":
+      enabled: false 
+    "34":
+      enabled: false
+    "35":
+      enabled: false
+    "36":
+      enabled: false
+    "37":
+      enabled: false
+    "19":
+      enabled: false
+
+  ptp:
+    enabled: false
+
+

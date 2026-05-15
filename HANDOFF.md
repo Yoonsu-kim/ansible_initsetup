@@ -2,10 +2,10 @@
 
 This repository is being shaped into an Ansible-based generator/deployer for `initial_setup.sh`.
 
-The user wants to manage different `initial_setup.sh` settings for A, B, and C hosts without maintaining three separate shell scripts. The selected design is:
+The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, and ODIC roles without maintaining three separate shell scripts. The selected design is:
 
 - Store common defaults in `group_vars/all.yml`.
-- Store per-host differences in `host_vars/A.yml`, `host_vars/B.yml`, and `host_vars/C.yml`.
+- Store role differences in `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
 - Merge defaults plus host overrides with Ansible `combine(..., recursive=True)`.
 - Render `templates/initial_setup.sh.j2` to `initial_setup_dest`.
 - Use `--check --diff` when the user wants confirmation only.
@@ -19,20 +19,21 @@ The user wants to manage different `initial_setup.sh` settings for A, B, and C h
 
 - `inspect_initial_setup.sh`
   - Read-only shell/awk inspector.
-  - It parses a target script and prints sections for CAN pinmux, modules, CAN interfaces, IRQ affinity, ethtool, VLAN/IP, route/firewall, and PTP.
+  - It parses a target script and prints sections for CAN pinmux command presence, module `modprobe` command presence, CAN interfaces, IRQ affinity, ethtool, VLAN/IP, route/firewall, and PTP.
   - It does not execute the target script.
 
 - `group_vars/all.yml`
   - Main default configuration.
   - Contains `initial_setup_dest` and `initial_setup_defaults`.
-  - Current defaults reflect the current `initial_setup.sh` settings, with one intentional fix: generated PTP commands default to no `exec`.
+  - Current configurable defaults reflect the current `initial_setup.sh` settings, with one intentional fix: generated PTP commands default to no `exec`.
+  - CAN pinmux and kernel module commands are intentionally fixed in the template instead of exposed as variables.
 
-- `host_vars/A.yml`, `host_vars/B.yml`, `host_vars/C.yml`
+- `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`
   - Currently contain only:
     ```yaml
     initial_setup_overrides: {}
     ```
-  - User-specific A/B/C differences should be added here.
+  - Role-specific ODIM/ODIL/ODIC differences should be added here.
 
 - `templates/initial_setup.sh.j2`
   - Generates the actual shell script from merged `initial_setup`.
@@ -48,14 +49,20 @@ The user wants to manage different `initial_setup.sh` settings for A, B, and C h
     ```
 
 - `inventory.ini`
-  - Placeholder hosts:
+  - Single-set inventory. The operator passes the selected ODIM VPN IP and SSH password at runtime with `-e odim_vpn_ip=... -e ssh_pass=...`.
+  - ODIL/ODIC use fixed internal IPs and SSH through ODIM with `ProxyCommand + sshpass`.
+  - Hosts:
     ```ini
-    [initial_setup_targets]
-    A
-    B
-    C
+    [initial_setup_targets:children]
+    role_odim
+    role_odil
+    role_odic
     ```
-  - Needs real `ansible_host`/`ansible_user` values before remote use.
+
+- `inventory_fleet.example.ini`
+  - Example for deploying to many ODIM sets at once.
+  - Uses unique aliases such as `car01_odim`, `car01_odil`, and `car01_odic`.
+  - ODIL/ODIC keep fixed internal IPs, but each line uses the matching ODIM VPN IP through `ProxyCommand + sshpass`.
 
 - `ansible.cfg`
   - Sets Ansible temp dirs to `/tmp` because the environment could not write to `/home/blackpanther/.ansible/tmp`.
@@ -76,19 +83,21 @@ Local render test was also performed successfully:
 
 ```bash
 ansible-playbook -i inventory.ini deploy_initial_setup.yml \
-  --limit A \
+  --limit odim \
+  -e odim_vpn_ip=10.8.0.11 \
+  -e ssh_pass=dev \
   -e ansible_connection=local \
-  -e initial_setup_dest=/tmp/initial_setup.A.sh
+  -e initial_setup_dest=/tmp/initial_setup.odim.sh
 ```
 
 Then:
 
 ```bash
-bash -n /tmp/initial_setup.A.sh
-./inspect_initial_setup.sh /tmp/initial_setup.A.sh
+bash -n /tmp/initial_setup.odim.sh
+./inspect_initial_setup.sh /tmp/initial_setup.odim.sh
 ```
 
-The generated `/tmp/initial_setup.A.sh` inspected cleanly with no warnings.
+The generated `/tmp/initial_setup.odim.sh` inspected cleanly with no warnings.
 
 ## Important Behavioral Notes
 
@@ -102,7 +111,7 @@ The generated `/tmp/initial_setup.A.sh` inspected cleanly with no warnings.
 
 ## Example Override
 
-For B, changing VLAN IPs and disabling PTP:
+For the ODIL role, changing VLAN IPs and disabling PTP:
 
 ```yaml
 initial_setup_overrides:
@@ -116,7 +125,7 @@ initial_setup_overrides:
     enabled: false
 ```
 
-For C, changing parent interface and disabling `can1`:
+For the ODIC role, changing parent interface and disabling `can1`:
 
 ```yaml
 initial_setup_overrides:
@@ -129,19 +138,20 @@ initial_setup_overrides:
 
 ## Likely Next Steps
 
-1. Ask the user for real hostnames/IPs/users for A, B, and C, then update `inventory.ini`.
-2. Ask which settings differ per host, then fill in `host_vars/A.yml`, `host_vars/B.yml`, and `host_vars/C.yml`.
-3. Run:
+1. For single-set work, pass the selected ODIM VPN IP and SSH password with `-e odim_vpn_ip=... -e ssh_pass=...`.
+2. For fleet work, copy `inventory_fleet.example.ini` to `inventory_fleet.ini` and add each ODIM set with unique aliases.
+3. Ask which settings differ per role, then fill in `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
+4. Run:
    ```bash
-   ansible-playbook -i inventory.ini deploy_initial_setup.yml --check --diff
+   ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev --check --diff
    ```
-4. If the diff is correct, apply:
+5. If the diff is correct, apply:
    ```bash
-   ansible-playbook -i inventory.ini deploy_initial_setup.yml
+   ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev
    ```
-5. Optionally verify rendered remote scripts with:
+6. Optionally verify rendered remote scripts with:
    ```bash
-   ssh A 'bash -s -- /home/odin/initial_setup.sh' < inspect_initial_setup.sh
+   ssh odim 'bash -s -- /home/odin/initial_setup.sh' < inspect_initial_setup.sh
    ```
 
 ## Caveats
@@ -151,5 +161,5 @@ initial_setup_overrides:
   fatal: not a git repository (or any of the parent directories): .git
   ```
   Do not assume normal Git commands work here.
-- Remote connectivity has not been tested because actual A/B/C connection information is not yet configured.
+- Remote connectivity has not been tested because actual odim/odil/odic connection information is not yet configured.
 - The original `initial_setup.sh` remains unchanged; generated output is driven by YAML plus Jinja.

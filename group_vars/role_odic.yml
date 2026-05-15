@@ -1,0 +1,29 @@
+# Add only ODIC role-specific differences here.
+initial_setup_overrides: 
+
+  can_interfaces:
+    can0:
+      enabled: true
+      fd: true
+      bitrate: 500000
+      sample_point: "0.8"
+      sjw: 3
+      dbitrate: 2000000
+      dsample_point: "0.8"
+      dsjw: 3
+      berr_reporting: true
+      restart_ms: 100
+    can1:
+      enabled: true
+      fd: true
+      bitrate: 500000
+      sample_point: "0.8"
+      sjw: 3
+      dbitrate: 2000000
+      dsample_point: "0.8"
+      dsjw: 3
+      berr_reporting: true
+      restart_ms: 100
+
+  ptp:
+    enabled: false 

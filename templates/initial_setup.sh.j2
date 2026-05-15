@@ -3,20 +3,18 @@ set -e
 
 #---------------------------------#
 # Runtime pinmux setting for CAN
-{% for pinmux in initial_setup.can_pinmux %}
-busybox devmem {{ pinmux.address }} {{ pinmux.width }} {{ pinmux.value }}
-{% endfor %}
+busybox devmem 0x0c303018 w 0xc458
+busybox devmem 0x0c303010 w 0xc400
+busybox devmem 0x0c303008 w 0xc458
+busybox devmem 0x0c303000 w 0xc400
 #---------------------------------#
 
 #---------------------------------#
 # Load kernel modules
-{% for module, enabled in initial_setup.kernel_modules.items() %}
-{% if enabled %}
-modprobe {{ module }}
-{% else %}
-# modprobe {{ module }}
-{% endif %}
-{% endfor %}
+modprobe can
+modprobe can-raw
+modprobe mttcan
+modprobe 8021q
 #---------------------------------#
 
 #---------------------------------#

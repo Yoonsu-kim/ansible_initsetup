@@ -87,11 +87,13 @@ BEGIN {
 }
 
 section == "can_pinmux" && /^[[:space:]]*#?-?[[:space:]]*busybox[[:space:]]+devmem/ {
-  can_pinmux[++can_pinmux_count] = status($0) " | " command_text($0)
+  can_pinmux_count++
+  if (status($0) == "enabled") enabled_can_pinmux_count++
 }
 
 section == "modules" && /^[[:space:]]*#?[[:space:]]*modprobe[[:space:]]+/ {
-  modules[++module_count] = status($0) " | " command_text($0)
+  module_count++
+  if (status($0) == "enabled") enabled_module_count++
 }
 
 section == "can" && /^[[:space:]]*#?[[:space:]]*ip[[:space:]]+link[[:space:]]+set[[:space:]]+can[0-9]+[[:space:]]+/ {
@@ -161,13 +163,13 @@ section == "ptp" && /^[[:space:]]*#?[[:space:]]*(exec[[:space:]]+)?\/usr\/local\
 
 END {
   print "[CAN pinmux]"
-  if (!can_pinmux_count) print "  none"
-  for (i = 1; i <= can_pinmux_count; i++) print "  " can_pinmux[i]
+  if (can_pinmux_count) print "  present=yes devmem_count=" can_pinmux_count " enabled_count=" enabled_can_pinmux_count
+  else print "  present=no"
   print ""
 
   print "[Kernel modules]"
-  if (!module_count) print "  none"
-  for (i = 1; i <= module_count; i++) print "  " modules[i]
+  if (module_count) print "  present=yes modprobe_count=" module_count " enabled_count=" enabled_module_count
+  else print "  present=no"
   print ""
 
   print "[CAN interfaces]"
