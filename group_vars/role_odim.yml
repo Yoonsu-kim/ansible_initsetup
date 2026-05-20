@@ -28,6 +28,10 @@ initial_setup_overrides:
       enabled: false
     "31":
       enabled: false 
+    "32":
+      enabled: false
+    "33":
+      enabled: false
     "34":
       enabled: false
     "35":

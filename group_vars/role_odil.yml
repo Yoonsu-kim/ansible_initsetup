@@ -1,5 +1,16 @@
 # Add only ODIL role-specific differences here.
 initial_setup_overrides: 
+  vlans:
+    "31":
+      enabled: false
+    "32":
+      enabled: false
+    "33":
+      enabled: false
+    "36":
+      enabled: false
+    "19":
+      enabled: false
   ptp:
     enabled: true
     use_exec: true 
@@ -14,4 +25,3 @@ initial_setup_overrides:
         interface: "veth0"
         config: "/home/odin/ptp4l_veth0_ars.cfg"
         log: "/var/log/ptp4l_veth0_ars.log"
-

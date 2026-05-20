@@ -1,6 +1,16 @@
 # Add only ODIC role-specific differences here.
 initial_setup_overrides: 
 
-
+  vlans:
+    "31":
+      enabled: false
+    "32":
+      enabled: false
+    "33":
+      enabled: false
+    "36":
+      enabled: false
+    "19":
+      enabled: false
   ptp:
-    enabled: false 
+    enabled: false
