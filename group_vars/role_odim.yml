@@ -5,7 +5,7 @@ initial_setup_overrides:
       enabled: true
       fd: true
       bitrate: 500000
-      sample_point: "0. 75"
+      sample_point: "0.75"
       sjw: 3
       dbitrate: 2000000
       dsample_point: "0.8"
@@ -45,5 +45,4 @@ initial_setup_overrides:
 
   ptp:
     enabled: false
-
 
