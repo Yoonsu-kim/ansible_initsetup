@@ -1,13 +1,24 @@
 - name: Deploy initial_setup.sh from defaults plus host overrides
   hosts: initial_setup_targets
   gather_facts: false
-  vars:
-    initial_setup: "{{ initial_setup_defaults | combine(initial_setup_overrides | default({}), recursive=True) }}"
 
   tasks:
+    - name: Load selected config set defaults
+      ansible.builtin.include_vars:
+        file: "config_sets/{{ initial_setup_config_set }}/all.yml"
+      when: initial_setup_config_set is defined
+
+    - name: Load selected config set role overrides
+      ansible.builtin.include_vars:
+        file: "config_sets/{{ initial_setup_config_set }}/{{ initial_setup_config_role }}.yml"
+      when: initial_setup_config_set is defined
+
+    - name: Build merged initial setup config
+      ansible.builtin.set_fact:
+        initial_setup: "{{ initial_setup_defaults | combine(initial_setup_overrides | default({}), recursive=True) }}"
+
     - name: Render initial_setup.sh
       ansible.builtin.template:
         src: templates/initial_setup.sh.j2
         dest: "{{ initial_setup_dest }}"
         mode: "0755"
-

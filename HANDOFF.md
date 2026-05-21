@@ -6,6 +6,7 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
 
 - Store common defaults in `group_vars/all.yml`.
 - Store role differences in `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
+- For fleet deployments where different vehicles need different complete config sets, store selectable copies under `config_sets/<set_name>/all.yml` and `config_sets/<set_name>/role_*.yml`.
 - Merge defaults plus host overrides with Ansible `combine(..., recursive=True)`.
 - Render `templates/initial_setup.sh.j2` to `initial_setup_dest`.
 - Use `--check --diff` when the user wants confirmation only.
@@ -33,6 +34,14 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
   - They are intentionally not complete final configs; unchanged leaf values are inherited from `initial_setup_defaults`.
   - VLAN 2 keeps common description/default gateway in `group_vars/all.yml`, while each role sets its own IP.
 
+- `config_sets/group_vars/`
+  - Fleet-selectable copy of the current `group_vars` config set.
+  - Contains `all.yml`, `role_odim.yml`, `role_odil.yml`, and `role_odic.yml`.
+
+- `config_sets/group_vars2/`
+  - Second fleet-selectable config set, currently copied from `group_vars` as a starting point.
+  - Edit these files when a second vehicle family needs different defaults or role overrides.
+
 - `templates/initial_setup.sh.j2`
   - Generates the actual shell script from merged `initial_setup`.
   - Generates CAN-FD or classic CAN based on `can.fd`.
@@ -41,10 +50,16 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
 
 - `deploy_initial_setup.yml`
   - Renders `templates/initial_setup.sh.j2` to `initial_setup_dest`.
-  - Uses:
+  - If `initial_setup_config_set` is defined on the host, loads:
+    ```text
+    config_sets/{{ initial_setup_config_set }}/all.yml
+    config_sets/{{ initial_setup_config_set }}/{{ initial_setup_config_role }}.yml
+    ```
+  - Then uses:
     ```yaml
     initial_setup: "{{ initial_setup_defaults | combine(initial_setup_overrides | default({}), recursive=True) }}"
     ```
+  - If no `initial_setup_config_set` is set, it keeps the existing single-set behavior based on Ansible's automatic `group_vars` loading.
 
 - `inventory.ini`
   - Single-set inventory. The operator passes the selected ODIM VPN IP and SSH password at runtime with `-e odim_vpn_ip=... -e ssh_pass=...`.
@@ -64,11 +79,15 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
 
 - `inventory_odim_list.example.yml`
   - Preferred fleet example when only ODIM VPN IP changes per set.
-  - Operators copy this to `inventory_odim_list.yml` and list only:
+  - Operators copy this to `inventory_odim_list.yml` and list each ODIM IP plus the config set:
     ```yaml
     odim_sets:
-      car01: 10.8.0.11
-      car02: 10.8.0.12
+      car01:
+        odim_ip: 10.8.0.11
+        config_set: group_vars
+      car02:
+        odim_ip: 10.8.0.12
+        config_set: group_vars2
     ```
   - `odil_inner_ip` and `odic_inner_ip` are shared across sets.
 
@@ -76,6 +95,7 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
   - First play runs on localhost and creates runtime hosts with `add_host`.
   - For each `odim_sets` entry it creates `<set>_odim`, `<set>_odil`, and `<set>_odic`.
   - ODIL/ODIC use the matching ODIM VPN IP as the `ProxyCommand` jump target.
+  - Each generated host receives `initial_setup_config_set` and `initial_setup_config_role`, so different vehicles can use different config directories in the same run.
   - Imports `deploy_initial_setup.yml` after runtime hosts are created.
   - Supports `-e fleet_set=car02` or `-e fleet_set=car01,car03` to build only selected sets. This is preferred over `--limit` because the dynamic hosts do not exist before the first play runs.
 
@@ -92,6 +112,7 @@ Commands that passed:
 ```bash
 ansible-playbook -i inventory.ini deploy_initial_setup.yml --syntax-check
 ansible-playbook -i inventory_odim_list.example.yml deploy_fleet_from_odim_list.yml --syntax-check
+ansible-playbook -i inventory_odim_list.example.yml deploy_fleet_from_odim_list.yml -e ssh_pass=dev -e fleet_set=car02 -e ansible_connection=local -e initial_setup_dest=/tmp/initial_setup.config-set-test.sh --check
 bash -n inspect_initial_setup.sh
 ```
 
@@ -155,22 +176,23 @@ initial_setup_overrides:
 ## Likely Next Steps
 
 1. For single-set work, pass the selected ODIM VPN IP and SSH password with `-e odim_vpn_ip=... -e ssh_pass=...`.
-2. For fleet work where only ODIM VPN IP differs per set, copy `inventory_odim_list.example.yml` to `inventory_odim_list.yml` and add each set under `odim_sets`.
+2. For fleet work where only ODIM VPN IP differs per set, copy `inventory_odim_list.example.yml` to `inventory_odim_list.yml` and add each set under `odim_sets` with `odim_ip` and `config_set`.
 3. For fleet work where internal IPs or jump behavior differ per set, copy `inventory_fleet.example.ini` to `inventory_fleet.ini` and add each ODIM/ODIL/ODIC alias explicitly.
-4. Ask which settings differ per role, then add only those differences to `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
-5. Run for a single set:
+4. For single-set config changes, edit `group_vars/all.yml` and `group_vars/role_*.yml`.
+5. For fleet config-set changes, edit `config_sets/<set_name>/all.yml` and `config_sets/<set_name>/role_*.yml`.
+6. Run for a single set:
    ```bash
    ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev --check --diff
    ```
-6. Or run for an ODIM IP list:
+7. Or run for an ODIM IP list:
    ```bash
    ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml -e ssh_pass=dev --check --diff
    ```
-7. If the diff is correct, apply:
+8. If the diff is correct, apply:
    ```bash
    ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev
    ```
-8. Optionally verify rendered remote scripts with:
+9. Optionally verify rendered remote scripts with:
    ```bash
    ssh odim 'bash -s -- /home/odin/initial_setup.sh' < inspect_initial_setup.sh
    ```

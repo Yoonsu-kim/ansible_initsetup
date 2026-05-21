@@ -4,6 +4,8 @@
 
 기본 설정은 `group_vars/all.yml`에 두고, ODIM/ODIL/ODIC 역할별 차이는 `group_vars/role_<role>.yml`의 `initial_setup_overrides`에 필요한 값만 overlay합니다. 역할별 파일은 최종 설정 전체가 아니라 공통값과 다른 부분만 담습니다.
 
+여러 차량이 서로 다른 설정 묶음을 사용해야 하면 `config_sets/<설정명>/` 아래에 `group_vars`와 같은 파일 묶음을 만들고, `inventory_odim_list.yml`의 각 `odim_sets` 항목에서 `config_set`을 지정합니다.
+
 ## 파일 구조
 
 ```text
@@ -13,6 +15,14 @@ inventory_fleet.example.ini
 inventory_odim_list.example.yml
 deploy_initial_setup.yml
 deploy_fleet_from_odim_list.yml
+config_sets/group_vars/all.yml
+config_sets/group_vars/role_odim.yml
+config_sets/group_vars/role_odil.yml
+config_sets/group_vars/role_odic.yml
+config_sets/group_vars2/all.yml
+config_sets/group_vars2/role_odim.yml
+config_sets/group_vars2/role_odil.yml
+config_sets/group_vars2/role_odic.yml
 group_vars/all.yml
 group_vars/role_odim.yml
 group_vars/role_odil.yml
@@ -24,6 +34,7 @@ initial_setup.sh
 
 - `group_vars/all.yml`: 모든 장비에 적용되는 기본 설정
 - `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`: ODIM/ODIL/ODIC 역할별 override 설정
+- `config_sets/<설정명>/all.yml`, `config_sets/<설정명>/role_*.yml`: fleet 배포에서 차량별로 선택할 수 있는 설정 묶음
 - `inventory.ini`: ODIM VPN IP 하나를 넘겨 한 세트만 작업하는 inventory
 - `inventory_odim_list.example.yml`: ODIM IP 목록만으로 여러 세트를 작업하는 inventory 예시
 - `inventory_fleet.example.ini`: host alias를 직접 나열하는 fleet inventory 예시
@@ -35,7 +46,7 @@ initial_setup.sh
 
 ## Inventory 설정
 
-두 가지 방식을 같이 지원합니다.
+세 가지 방식을 같이 지원합니다.
 
 ### 한 세트만 작업
 
@@ -67,7 +78,7 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
 
 ### ODIM IP 목록으로 여러 세트 작업
 
-ODIM의 VPN IP만 세트별로 다르고, ODIM에 접속한 뒤 ODIL/ODIC으로 들어가는 내부 IP가 모든 세트에서 같다면 이 방식을 사용합니다.
+ODIM의 VPN IP만 세트별로 다르고, ODIM에 접속한 뒤 ODIL/ODIC으로 들어가는 내부 IP가 모든 세트에서 같다면 이 방식을 사용합니다. 각 세트는 `config_set`으로 사용할 설정 묶음을 선택합니다.
 
 `inventory_odim_list.example.yml`을 복사해서 실제 목록을 만듭니다.
 
@@ -93,9 +104,15 @@ all:
     odic_inner_ip: 192.168.31.8
 
     odim_sets:
-      car01: 10.8.0.11
-      car02: 10.8.0.12
-      car03: 10.8.0.13
+      car01:
+        odim_ip: 10.8.0.11
+        config_set: group_vars
+      car02:
+        odim_ip: 10.8.0.12
+        config_set: group_vars2
+      car03:
+        odim_ip: 10.8.0.13
+        config_set: group_vars
 ```
 
 전체 세트 확인:
@@ -138,7 +155,17 @@ car01_odil -> 192.168.31.7 via car01 ODIM
 car01_odic -> 192.168.31.8 via car01 ODIM
 ```
 
-역할별 설정은 기존처럼 `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`가 적용됩니다.
+`car01`은 `config_sets/group_vars/` 설정을 사용하고, `car02`는 `config_sets/group_vars2/` 설정을 사용합니다. 각 설정 묶음은 다음 파일을 가집니다.
+
+```text
+config_sets/<설정명>/
+  all.yml
+  role_odim.yml
+  role_odil.yml
+  role_odic.yml
+```
+
+`deploy_fleet_from_odim_list.yml`은 실행 중에 host별 `config_set`을 읽고, `deploy_initial_setup.yml`이 해당 설정 묶음의 `all.yml`과 역할별 `role_*.yml`을 로드합니다. 이 방식에서는 여러 차량을 동시에 배포해도 차량마다 서로 다른 기본값과 역할별 override를 사용할 수 있습니다.
 
 제어 PC에 `sshpass`가 설치되어 있어야 합니다. ODIM/ODIL/ODIC의 SSH 비밀번호가 같다는 전제로 `ssh_pass` 하나를 사용합니다.
 
@@ -169,6 +196,8 @@ car02_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_
 
 공통 기본값은 `group_vars/all.yml`에서 수정합니다.
 
+ODIM IP 목록 fleet 배포에서 차량별 설정 묶음을 선택하려면 `config_sets/<설정명>/all.yml`을 수정합니다. 예를 들어 `car02`가 `config_set: group_vars2`를 사용한다면 `config_sets/group_vars2/all.yml`과 `config_sets/group_vars2/role_*.yml`을 수정합니다.
+
 주요 항목:
 
 - `initial_setup_dest`: 원격 장비에 생성할 스크립트 경로
@@ -182,6 +211,8 @@ car02_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_
 ## 장비별 Override
 
 ODIM/ODIL/ODIC 역할별로 다른 값은 `group_vars/role_<role>.yml`에 적습니다. 이 방식은 단일 세트 inventory와 fleet inventory에서 같은 override를 공유합니다.
+
+ODIM IP 목록 fleet 배포에서 설정 묶음별로 역할 override를 다르게 가져가려면 `config_sets/<설정명>/role_<role>.yml`에 적습니다. 예를 들어 `car02`만 다른 ODIL 설정을 쓰려면 `inventory_odim_list.yml`에서 `car02.config_set`을 `group_vars2`로 지정하고 `config_sets/group_vars2/role_odil.yml`을 수정합니다.
 
 `initial_setup_overrides`는 `initial_setup_defaults` 위에 recursive merge됩니다. 따라서 role 파일에는 바꾸려는 leaf 값만 적습니다. 예를 들어 VLAN 2의 description/default gateway는 공통값을 상속하고, 역할별 파일에는 장비별 IP만 둡니다.
 

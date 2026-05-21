@@ -3,6 +3,7 @@
   gather_facts: false
   vars:
     selected_odim_sets: "{{ (fleet_set.split(',') | map('trim') | list) if fleet_set is defined else [] }}"
+    default_config_set: group_vars
     common_ssh_args: >-
       -o StrictHostKeyChecking=no
       -o UserKnownHostsFile=/dev/null
@@ -13,10 +14,12 @@
         groups:
           - initial_setup_targets
           - role_odim
-        ansible_host: "{{ item.value }}"
+        ansible_host: "{{ item.value.odim_ip if item.value is mapping else item.value }}"
         ansible_user: odin
         ansible_password: "{{ ssh_pass | mandatory }}"
         ansible_ssh_common_args: "{{ common_ssh_args }}"
+        initial_setup_config_set: "{{ item.value.config_set | default(default_config_set) if item.value is mapping else default_config_set }}"
+        initial_setup_config_role: role_odim
       loop: "{{ odim_sets | dict2items }}"
       when: fleet_set is not defined or item.key in selected_odim_sets
 
@@ -33,7 +36,9 @@
           {{ common_ssh_args }}
           -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p
           {{ common_ssh_args }}
-          odin@{{ item.value }}"
+          odin@{{ item.value.odim_ip if item.value is mapping else item.value }}"
+        initial_setup_config_set: "{{ item.value.config_set | default(default_config_set) if item.value is mapping else default_config_set }}"
+        initial_setup_config_role: role_odil
       loop: "{{ odim_sets | dict2items }}"
       when: fleet_set is not defined or item.key in selected_odim_sets
 
@@ -50,7 +55,9 @@
           {{ common_ssh_args }}
           -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p
           {{ common_ssh_args }}
-          odin@{{ item.value }}"
+          odin@{{ item.value.odim_ip if item.value is mapping else item.value }}"
+        initial_setup_config_set: "{{ item.value.config_set | default(default_config_set) if item.value is mapping else default_config_set }}"
+        initial_setup_config_role: role_odic
       loop: "{{ odim_sets | dict2items }}"
       when: fleet_set is not defined or item.key in selected_odim_sets
 
