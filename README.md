@@ -2,7 +2,7 @@
 
 `initial_setup.sh`를 장비별로 생성하고 배포하기 위한 Ansible 구성입니다.
 
-기본 설정은 `group_vars/all.yml`에 두고, ODIM/ODIL/ODIC 역할별 차이는 `group_vars/role_<role>.yml`의 `initial_setup_overrides`에 필요한 값만 overlay합니다.
+기본 설정은 `group_vars/all.yml`에 두고, ODIM/ODIL/ODIC 역할별 차이는 `group_vars/role_<role>.yml`의 `initial_setup_overrides`에 필요한 값만 overlay합니다. 역할별 파일은 최종 설정 전체가 아니라 공통값과 다른 부분만 담습니다.
 
 ## 파일 구조
 
@@ -104,15 +104,18 @@ car02_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_
 
 ODIM/ODIL/ODIC 역할별로 다른 값은 `group_vars/role_<role>.yml`에 적습니다. 이 방식은 단일 세트 inventory와 fleet inventory에서 같은 override를 공유합니다.
 
-예: odil 장비의 일부 VLAN IP만 변경하고 PTP를 끄는 경우
+`initial_setup_overrides`는 `initial_setup_defaults` 위에 recursive merge됩니다. 따라서 role 파일에는 바꾸려는 leaf 값만 적습니다. 예를 들어 VLAN 2의 description/default gateway는 공통값을 상속하고, 역할별 파일에는 장비별 IP만 둡니다.
+
+예: odil 장비의 Internet VLAN IP만 변경하고 일부 VLAN과 PTP를 끄는 경우
 
 ```yaml
 initial_setup_overrides:
   vlans:
-    "30":
-      ip: "10.30.1.208/24"
+    "2":
+      enabled: true
+      ip: "192.168.9.102/24"
     "31":
-      ip: "10.31.1.208/24"
+      enabled: false
 
   ptp:
     enabled: false
@@ -128,8 +131,6 @@ initial_setup_overrides:
     can1:
       enabled: false
 ```
-
-`initial_setup_overrides`는 `initial_setup_defaults` 위에 recursive merge됩니다.
 
 fleet inventory에서 특정 차량 하나만 다른 설정이 필요하면 `host_vars/car01_odil.yml`처럼 alias와 같은 이름의 host_vars 파일을 추가합니다.
 

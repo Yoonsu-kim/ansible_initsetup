@@ -44,11 +44,6 @@ initial_setup_defaults:
   sensor_interface: "veth0"
 
   vlans:
-    "2":
-      enabled: true
-      description: "Internet interface"
-      ip: "192.168.9.102/24"
-      default_gw: "192.168.9.1"
     "30":
       enabled: true
       description: "Pandar64_0 interface"
@@ -87,6 +82,10 @@ initial_setup_defaults:
       ip: "10.13.1.166/24"
       firewall:
         - iptables -I INPUT 1 -p udp --dport 42102 -j ACCEPT
+    "2":
+      enabled: false
+      description: "Internet interface"
+      default_gw: "192.168.9.1"
 
   ptp:
     enabled: true

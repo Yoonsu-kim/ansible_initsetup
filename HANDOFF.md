@@ -29,11 +29,9 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
   - CAN pinmux and kernel module commands are intentionally fixed in the template instead of exposed as variables.
 
 - `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`
-  - Currently contain only:
-    ```yaml
-    initial_setup_overrides: {}
-    ```
-  - Role-specific ODIM/ODIL/ODIC differences should be added here.
+  - Contain only role-specific differences under `initial_setup_overrides`.
+  - They are intentionally not complete final configs; unchanged leaf values are inherited from `initial_setup_defaults`.
+  - VLAN 2 keeps common description/default gateway in `group_vars/all.yml`, while each role sets its own IP.
 
 - `templates/initial_setup.sh.j2`
   - Generates the actual shell script from merged `initial_setup`.
@@ -104,6 +102,7 @@ The generated `/tmp/initial_setup.odim.sh` inspected cleanly with no warnings.
 - `--check --diff` is the intended command for "confirmation only".
 - Running the playbook without `--check` writes `initial_setup_dest` on the remote host.
 - Dicts are used for `can_interfaces`, `irq_affinity`, `vlans`, and `ptp.configs` so host overrides can replace only specific keys.
+- Role files should override only values that differ from `group_vars/all.yml`; avoid repeating inherited defaults.
 - Lists are avoided for overlay-sensitive settings because Ansible list variables are replaced wholesale.
 - `ptp.use_exec` defaults to `false`.
   - The original script used two `exec /usr/local/sbin/ptp4l ... &` lines.
@@ -111,15 +110,14 @@ The generated `/tmp/initial_setup.odim.sh` inspected cleanly with no warnings.
 
 ## Example Override
 
-For the ODIL role, changing VLAN IPs and disabling PTP:
+For the ODIL role, changing the Internet VLAN IP and disabling PTP:
 
 ```yaml
 initial_setup_overrides:
   vlans:
-    "30":
-      ip: "10.30.1.208/24"
-    "31":
-      ip: "10.31.1.208/24"
+    "2":
+      enabled: true
+      ip: "192.168.9.102/24"
 
   ptp:
     enabled: false
@@ -140,7 +138,7 @@ initial_setup_overrides:
 
 1. For single-set work, pass the selected ODIM VPN IP and SSH password with `-e odim_vpn_ip=... -e ssh_pass=...`.
 2. For fleet work, copy `inventory_fleet.example.ini` to `inventory_fleet.ini` and add each ODIM set with unique aliases.
-3. Ask which settings differ per role, then fill in `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
+3. Ask which settings differ per role, then add only those differences to `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
 4. Run:
    ```bash
    ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev --check --diff

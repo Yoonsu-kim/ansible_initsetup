@@ -2,28 +2,21 @@
 initial_setup_overrides: 
   can_interfaces:
     can0:
-      enabled: true
       fd: true
-      bitrate: 500000
       sample_point: "0.75"
-      sjw: 3
       dbitrate: 2000000
       dsample_point: "0.8"
       dsjw: 3
-      berr_reporting: true
-      restart_ms: 100
     can1:
-      enabled: true
       fd: true
-      bitrate: 500000
       sample_point: "0.75"
-      sjw: 3
       dbitrate: 2000000
       dsample_point: "0.8"
       dsjw: 3
-      berr_reporting: true
-      restart_ms: 100
   vlans:
+    "2":
+      enabled: true
+      ip: "192.168.9.101/24"
     "30":
       enabled: false
     "31":
@@ -45,4 +38,3 @@ initial_setup_overrides:
 
   ptp:
     enabled: false
-
