@@ -10,7 +10,9 @@
 ansible.cfg
 inventory.ini
 inventory_fleet.example.ini
+inventory_odim_list.example.yml
 deploy_initial_setup.yml
+deploy_fleet_from_odim_list.yml
 group_vars/all.yml
 group_vars/role_odim.yml
 group_vars/role_odil.yml
@@ -23,9 +25,11 @@ initial_setup.sh
 - `group_vars/all.yml`: 모든 장비에 적용되는 기본 설정
 - `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`: ODIM/ODIL/ODIC 역할별 override 설정
 - `inventory.ini`: ODIM VPN IP 하나를 넘겨 한 세트만 작업하는 inventory
-- `inventory_fleet.example.ini`: 여러 ODIM 세트를 동시에 작업하는 inventory 예시
+- `inventory_odim_list.example.yml`: ODIM IP 목록만으로 여러 세트를 작업하는 inventory 예시
+- `inventory_fleet.example.ini`: host alias를 직접 나열하는 fleet inventory 예시
 - `templates/initial_setup.sh.j2`: `initial_setup.sh` 생성 템플릿
 - `deploy_initial_setup.yml`: 원격 장비에 `initial_setup.sh`를 생성/배포하는 playbook
+- `deploy_fleet_from_odim_list.yml`: ODIM IP 목록에서 ODIM/ODIL/ODIC host를 생성한 뒤 배포하는 playbook
 - `inspect_initial_setup.sh`: 생성된 `initial_setup.sh`를 실행하지 않고 읽기 전용으로 검사하는 스크립트
 - `initial_setup.sh`: 기존 수동 스크립트
 
@@ -61,9 +65,86 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   -e ssh_pass=dev
 ```
 
-### 여러 세트 동시 작업
+### ODIM IP 목록으로 여러 세트 작업
 
-여러 ODIM 세트를 동시에 배포할 때는 `inventory_fleet.example.ini`를 복사해서 차량별 alias를 추가합니다.
+ODIM의 VPN IP만 세트별로 다르고, ODIM에 접속한 뒤 ODIL/ODIC으로 들어가는 내부 IP가 모든 세트에서 같다면 이 방식을 사용합니다.
+
+`inventory_odim_list.example.yml`을 복사해서 실제 목록을 만듭니다.
+
+```bash
+cp inventory_odim_list.example.yml inventory_odim_list.yml
+```
+
+예:
+
+```yaml
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+  children:
+    initial_setup_targets:
+      children:
+        role_odim:
+        role_odil:
+        role_odic:
+  vars:
+    odil_inner_ip: 192.168.31.7
+    odic_inner_ip: 192.168.31.8
+
+    odim_sets:
+      car01: 10.8.0.11
+      car02: 10.8.0.12
+      car03: 10.8.0.13
+```
+
+전체 세트 확인:
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev \
+  --check --diff
+```
+
+전체 세트 적용:
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev
+```
+
+특정 세트만 확인하거나 적용하려면 `fleet_set`에 세트 이름을 지정합니다.
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev \
+  -e fleet_set=car02 \
+  --check --diff
+```
+
+여러 세트만 선택할 수도 있습니다.
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev \
+  -e fleet_set=car01,car03
+```
+
+이 playbook은 실행 중에 다음 host를 생성합니다.
+
+```text
+car01_odim -> 10.8.0.11
+car01_odil -> 192.168.31.7 via car01 ODIM
+car01_odic -> 192.168.31.8 via car01 ODIM
+```
+
+역할별 설정은 기존처럼 `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`가 적용됩니다.
+
+제어 PC에 `sshpass`가 설치되어 있어야 합니다. ODIM/ODIL/ODIC의 SSH 비밀번호가 같다는 전제로 `ssh_pass` 하나를 사용합니다.
+
+### Host alias를 직접 나열하는 fleet inventory
+
+세트별로 ODIL/ODIC 내부 IP나 접속 방식까지 다르면 `inventory_fleet.example.ini`를 복사해서 차량별 alias를 직접 추가할 수 있습니다.
 
 ```ini
 [initial_setup_targets:children]
@@ -83,8 +164,6 @@ car02_odil ansible_host=192.168.0.21 ansible_user=odin ansible_password="{{ ssh_
 car01_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.11"'
 car02_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.12"'
 ```
-
-제어 PC에 `sshpass`가 설치되어 있어야 합니다. ODIM/ODIL/ODIC의 SSH 비밀번호가 같다는 전제로 `ssh_pass` 하나를 사용합니다.
 
 ## 기본 설정 수정
 
@@ -155,12 +234,12 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   --check --diff
 ```
 
-fleet inventory에서 특정 세트만 확인하려면:
+ODIM IP 목록 inventory에서 특정 세트만 확인하려면:
 
 ```bash
-ansible-playbook -i inventory_fleet.ini deploy_initial_setup.yml \
-  --limit 'car01_*' \
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
   -e ssh_pass=dev \
+  -e fleet_set=car01 \
   --check --diff
 ```
 
@@ -181,10 +260,10 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   -e ssh_pass=dev
 ```
 
-fleet inventory 전체 적용:
+ODIM IP 목록 inventory 전체 적용:
 
 ```bash
-ansible-playbook -i inventory_fleet.ini deploy_initial_setup.yml \
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
   -e ssh_pass=dev
 ```
 

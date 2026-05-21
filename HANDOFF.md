@@ -62,6 +62,23 @@ The user wants to manage different `initial_setup.sh` settings for ODIM, ODIL, a
   - Uses unique aliases such as `car01_odim`, `car01_odil`, and `car01_odic`.
   - ODIL/ODIC keep fixed internal IPs, but each line uses the matching ODIM VPN IP through `ProxyCommand + sshpass`.
 
+- `inventory_odim_list.example.yml`
+  - Preferred fleet example when only ODIM VPN IP changes per set.
+  - Operators copy this to `inventory_odim_list.yml` and list only:
+    ```yaml
+    odim_sets:
+      car01: 10.8.0.11
+      car02: 10.8.0.12
+    ```
+  - `odil_inner_ip` and `odic_inner_ip` are shared across sets.
+
+- `deploy_fleet_from_odim_list.yml`
+  - First play runs on localhost and creates runtime hosts with `add_host`.
+  - For each `odim_sets` entry it creates `<set>_odim`, `<set>_odil`, and `<set>_odic`.
+  - ODIL/ODIC use the matching ODIM VPN IP as the `ProxyCommand` jump target.
+  - Imports `deploy_initial_setup.yml` after runtime hosts are created.
+  - Supports `-e fleet_set=car02` or `-e fleet_set=car01,car03` to build only selected sets. This is preferred over `--limit` because the dynamic hosts do not exist before the first play runs.
+
 - `ansible.cfg`
   - Sets Ansible temp dirs to `/tmp` because the environment could not write to `/home/blackpanther/.ansible/tmp`.
 
@@ -74,6 +91,7 @@ Commands that passed:
 
 ```bash
 ansible-playbook -i inventory.ini deploy_initial_setup.yml --syntax-check
+ansible-playbook -i inventory_odim_list.example.yml deploy_fleet_from_odim_list.yml --syntax-check
 bash -n inspect_initial_setup.sh
 ```
 
@@ -137,17 +155,22 @@ initial_setup_overrides:
 ## Likely Next Steps
 
 1. For single-set work, pass the selected ODIM VPN IP and SSH password with `-e odim_vpn_ip=... -e ssh_pass=...`.
-2. For fleet work, copy `inventory_fleet.example.ini` to `inventory_fleet.ini` and add each ODIM set with unique aliases.
-3. Ask which settings differ per role, then add only those differences to `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
-4. Run:
+2. For fleet work where only ODIM VPN IP differs per set, copy `inventory_odim_list.example.yml` to `inventory_odim_list.yml` and add each set under `odim_sets`.
+3. For fleet work where internal IPs or jump behavior differ per set, copy `inventory_fleet.example.ini` to `inventory_fleet.ini` and add each ODIM/ODIL/ODIC alias explicitly.
+4. Ask which settings differ per role, then add only those differences to `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, and `group_vars/role_odic.yml`.
+5. Run for a single set:
    ```bash
    ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev --check --diff
    ```
-5. If the diff is correct, apply:
+6. Or run for an ODIM IP list:
+   ```bash
+   ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml -e ssh_pass=dev --check --diff
+   ```
+7. If the diff is correct, apply:
    ```bash
    ansible-playbook -i inventory.ini deploy_initial_setup.yml -e odim_vpn_ip=10.8.0.11 -e ssh_pass=dev
    ```
-6. Optionally verify rendered remote scripts with:
+8. Optionally verify rendered remote scripts with:
    ```bash
    ssh odim 'bash -s -- /home/odin/initial_setup.sh' < inspect_initial_setup.sh
    ```

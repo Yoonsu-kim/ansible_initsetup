@@ -1,0 +1,58 @@
+- name: Build fleet inventory from ODIM IP list
+  hosts: localhost
+  gather_facts: false
+  vars:
+    selected_odim_sets: "{{ (fleet_set.split(',') | map('trim') | list) if fleet_set is defined else [] }}"
+    common_ssh_args: >-
+      -o StrictHostKeyChecking=no
+      -o UserKnownHostsFile=/dev/null
+  tasks:
+    - name: Add ODIM hosts
+      ansible.builtin.add_host:
+        name: "{{ item.key }}_odim"
+        groups:
+          - initial_setup_targets
+          - role_odim
+        ansible_host: "{{ item.value }}"
+        ansible_user: odin
+        ansible_password: "{{ ssh_pass | mandatory }}"
+        ansible_ssh_common_args: "{{ common_ssh_args }}"
+      loop: "{{ odim_sets | dict2items }}"
+      when: fleet_set is not defined or item.key in selected_odim_sets
+
+    - name: Add ODIL hosts through matching ODIM
+      ansible.builtin.add_host:
+        name: "{{ item.key }}_odil"
+        groups:
+          - initial_setup_targets
+          - role_odil
+        ansible_host: "{{ odil_inner_ip }}"
+        ansible_user: odin
+        ansible_password: "{{ ssh_pass | mandatory }}"
+        ansible_ssh_common_args: >-
+          {{ common_ssh_args }}
+          -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p
+          {{ common_ssh_args }}
+          odin@{{ item.value }}"
+      loop: "{{ odim_sets | dict2items }}"
+      when: fleet_set is not defined or item.key in selected_odim_sets
+
+    - name: Add ODIC hosts through matching ODIM
+      ansible.builtin.add_host:
+        name: "{{ item.key }}_odic"
+        groups:
+          - initial_setup_targets
+          - role_odic
+        ansible_host: "{{ odic_inner_ip }}"
+        ansible_user: odin
+        ansible_password: "{{ ssh_pass | mandatory }}"
+        ansible_ssh_common_args: >-
+          {{ common_ssh_args }}
+          -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p
+          {{ common_ssh_args }}
+          odin@{{ item.value }}"
+      loop: "{{ odim_sets | dict2items }}"
+      when: fleet_set is not defined or item.key in selected_odim_sets
+
+- name: Deploy generated inventory targets
+  ansible.builtin.import_playbook: deploy_initial_setup.yml
