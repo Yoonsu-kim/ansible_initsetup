@@ -1,8 +1,8 @@
 # Config Sets
 
-Fleet deployments can select a complete configuration set per ODIM set.
+Deployments select a complete configuration set per ODIM set.
 
-Each config set mirrors the normal `group_vars` layout:
+Each config set has one default file and one role override file per device role:
 
 ```text
 config_sets/<set_name>/
@@ -18,10 +18,8 @@ Use `inventory_odim_list.yml` to map a vehicle to a config set:
 odim_sets:
   car01:
     odim_ip: 10.8.0.11
-    config_set: group_vars
+    config_set: v6_5
   car02:
     odim_ip: 10.8.0.12
-    config_set: group_vars2
+    config_set: v6_5
 ```
-
-`group_vars/` remains available for the single-set inventory path.

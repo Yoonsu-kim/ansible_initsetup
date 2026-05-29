@@ -8,6 +8,3 @@ initial_setup_overrides:
       enabled: false
     "33":
       enabled: false
-  ptp:
-    enabled: true
-    use_exec: true

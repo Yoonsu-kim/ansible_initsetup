@@ -2,9 +2,9 @@
 
 `initial_setup.sh`를 장비별로 생성하고 배포하기 위한 Ansible 구성입니다.
 
-기본 설정은 `group_vars/all.yml`에 두고, ODIM/ODIL/ODIC 역할별 차이는 `group_vars/role_<role>.yml`의 `initial_setup_overrides`에 필요한 값만 overlay합니다. 역할별 파일은 최종 설정 전체가 아니라 공통값과 다른 부분만 담습니다.
+설정은 `config_sets/<설정명>/` 아래에 묶음으로 관리합니다. 공통 기본값은 `config_sets/<설정명>/all.yml`에 두고, ODIM/ODIL/ODIC 역할별 차이는 `config_sets/<설정명>/role_<role>.yml`의 `initial_setup_overrides`에 필요한 값만 overlay합니다.
 
-여러 차량이 서로 다른 설정 묶음을 사용해야 하면 `config_sets/<설정명>/` 아래에 `group_vars`와 같은 파일 묶음을 만들고, `inventory_odim_list.yml`의 각 `odim_sets` 항목에서 `config_set`을 지정합니다.
+여러 차량이 서로 다른 설정 묶음을 사용해야 하면 `inventory_odim_list.yml`의 각 `odim_sets` 항목에서 `config_set`을 지정합니다.
 
 ## 파일 구조
 
@@ -15,26 +15,20 @@ inventory_fleet.example.ini
 inventory_odim_list.example.yml
 deploy_initial_setup.yml
 deploy_fleet_from_odim_list.yml
-config_sets/group_vars/all.yml
-config_sets/group_vars/role_odim.yml
-config_sets/group_vars/role_odil.yml
-config_sets/group_vars/role_odic.yml
-config_sets/group_vars2/all.yml
-config_sets/group_vars2/role_odim.yml
-config_sets/group_vars2/role_odil.yml
-config_sets/group_vars2/role_odic.yml
-group_vars/all.yml
-group_vars/role_odim.yml
-group_vars/role_odil.yml
-group_vars/role_odic.yml
+config_sets/<설정명>/all.yml
+config_sets/<설정명>/role_odim.yml
+config_sets/<설정명>/role_odil.yml
+config_sets/<설정명>/role_odic.yml
+config_sets/v6_5/all.yml
+config_sets/v6_5/role_odim.yml
+config_sets/v6_5/role_odil.yml
+config_sets/v6_5/role_odic.yml
 templates/initial_setup.sh.j2
 inspect_initial_setup.sh
 initial_setup.sh
 ```
 
-- `group_vars/all.yml`: 모든 장비에 적용되는 기본 설정
-- `group_vars/role_odim.yml`, `group_vars/role_odil.yml`, `group_vars/role_odic.yml`: ODIM/ODIL/ODIC 역할별 override 설정
-- `config_sets/<설정명>/all.yml`, `config_sets/<설정명>/role_*.yml`: fleet 배포에서 차량별로 선택할 수 있는 설정 묶음
+- `config_sets/<설정명>/all.yml`, `config_sets/<설정명>/role_*.yml`: 장비별 `initial_setup.sh` 생성을 위한 설정 묶음
 - `inventory.ini`: ODIM VPN IP 하나를 넘겨 한 세트만 작업하는 inventory
 - `inventory_odim_list.example.yml`: ODIM IP 목록만으로 여러 세트를 작업하는 inventory 예시
 - `inventory_fleet.example.ini`: host alias를 직접 나열하는 fleet inventory 예시
@@ -61,19 +55,29 @@ role_odic
 [role_odim]
 odim ansible_host="{{ odim_vpn_ip | mandatory }}" ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}"
 
+[role_odim:vars]
+initial_setup_config_role=role_odim
+
 [role_odil]
-odil ansible_host=192.168.0.21 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null odin@{{ odim_vpn_ip | mandatory }}"'
+odil ansible_host=192.168.31.7 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null odin@{{ odim_vpn_ip | mandatory }}"'
+
+[role_odil:vars]
+initial_setup_config_role=role_odil
 
 [role_odic]
-odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null odin@{{ odim_vpn_ip | mandatory }}"'
+odic ansible_host=192.168.31.8 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null odin@{{ odim_vpn_ip | mandatory }}"'
+
+[role_odic:vars]
+initial_setup_config_role=role_odic
 ```
 
-실행할 때 대상 ODIM VPN IP와 SSH 비밀번호를 지정합니다.
+실행할 때 대상 ODIM VPN IP, SSH 비밀번호, 사용할 config set을 지정합니다.
 
 ```bash
 ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   -e odim_vpn_ip=10.8.0.11 \
-  -e ssh_pass=dev
+  -e ssh_pass=dev \
+  -e initial_setup_config_set=v6_5
 ```
 
 ### ODIM IP 목록으로 여러 세트 작업
@@ -106,13 +110,13 @@ all:
     odim_sets:
       car01:
         odim_ip: 10.8.0.11
-        config_set: group_vars
+        config_set: v6_5
       car02:
         odim_ip: 10.8.0.12
-        config_set: group_vars2
+        config_set: v6_5
       car03:
         odim_ip: 10.8.0.13
-        config_set: group_vars
+        config_set: v6_5
 ```
 
 전체 세트 확인:
@@ -155,7 +159,7 @@ car01_odil -> 192.168.31.7 via car01 ODIM
 car01_odic -> 192.168.31.8 via car01 ODIM
 ```
 
-`car01`은 `config_sets/group_vars/` 설정을 사용하고, `car02`는 `config_sets/group_vars2/` 설정을 사용합니다. 각 설정 묶음은 다음 파일을 가집니다.
+위 예시는 모든 차량이 `config_sets/v6_5/` 설정을 사용합니다. 차량별로 다른 설정이 필요하면 각 항목의 `config_set` 값을 다른 설정 묶음 이름으로 지정합니다. 각 설정 묶음은 다음 파일을 가집니다.
 
 ```text
 config_sets/<설정명>/
@@ -183,20 +187,29 @@ role_odic
 car01_odim ansible_host=10.8.0.11 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}"
 car02_odim ansible_host=10.8.0.12 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}"
 
+[role_odim:vars]
+initial_setup_config_role=role_odim
+
 [role_odil]
-car01_odil ansible_host=192.168.0.21 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.11"'
-car02_odil ansible_host=192.168.0.21 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.12"'
+car01_odil ansible_host=192.168.31.7 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.11"'
+car02_odil ansible_host=192.168.31.7 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.12"'
+
+[role_odil:vars]
+initial_setup_config_role=role_odil
 
 [role_odic]
-car01_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.11"'
-car02_odic ansible_host=192.168.0.22 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.12"'
+car01_odic ansible_host=192.168.31.8 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.11"'
+car02_odic ansible_host=192.168.31.8 ansible_user=odin ansible_password="{{ ssh_pass | mandatory }}" ansible_ssh_common_args='-o ProxyCommand="sshpass -p {{ ssh_pass | mandatory }} ssh -W %h:%p odin@10.8.0.12"'
+
+[role_odic:vars]
+initial_setup_config_role=role_odic
 ```
+
+실행 시 사용할 config set을 `-e initial_setup_config_set=v6_5`처럼 지정합니다.
 
 ## 기본 설정 수정
 
-공통 기본값은 `group_vars/all.yml`에서 수정합니다.
-
-ODIM IP 목록 fleet 배포에서 차량별 설정 묶음을 선택하려면 `config_sets/<설정명>/all.yml`을 수정합니다. 예를 들어 `car02`가 `config_set: group_vars2`를 사용한다면 `config_sets/group_vars2/all.yml`과 `config_sets/group_vars2/role_*.yml`을 수정합니다.
+공통 기본값은 `config_sets/<설정명>/all.yml`에서 수정합니다. 예를 들어 `config_set: v6_5`를 사용한다면 `config_sets/v6_5/all.yml`과 `config_sets/v6_5/role_*.yml`을 수정합니다.
 
 주요 항목:
 
@@ -210,9 +223,7 @@ ODIM IP 목록 fleet 배포에서 차량별 설정 묶음을 선택하려면 `co
 
 ## 장비별 Override
 
-ODIM/ODIL/ODIC 역할별로 다른 값은 `group_vars/role_<role>.yml`에 적습니다. 이 방식은 단일 세트 inventory와 fleet inventory에서 같은 override를 공유합니다.
-
-ODIM IP 목록 fleet 배포에서 설정 묶음별로 역할 override를 다르게 가져가려면 `config_sets/<설정명>/role_<role>.yml`에 적습니다. 예를 들어 `car02`만 다른 ODIL 설정을 쓰려면 `inventory_odim_list.yml`에서 `car02.config_set`을 `group_vars2`로 지정하고 `config_sets/group_vars2/role_odil.yml`을 수정합니다.
+ODIM/ODIL/ODIC 역할별로 다른 값은 `config_sets/<설정명>/role_<role>.yml`에 적습니다. 예를 들어 `car02`만 다른 ODIL 설정을 쓰려면 `inventory_odim_list.yml`에서 `car02.config_set`을 별도 설정 묶음으로 지정하고 해당 설정 묶음의 `role_odil.yml`을 수정합니다.
 
 `initial_setup_overrides`는 `initial_setup_defaults` 위에 recursive merge됩니다. 따라서 role 파일에는 바꾸려는 leaf 값만 적습니다. 예를 들어 VLAN 2의 description/default gateway는 공통값을 상속하고, 역할별 파일에는 장비별 IP만 둡니다.
 
@@ -242,8 +253,6 @@ initial_setup_overrides:
       enabled: false
 ```
 
-fleet inventory에서 특정 차량 하나만 다른 설정이 필요하면 `host_vars/car01_odil.yml`처럼 alias와 같은 이름의 host_vars 파일을 추가합니다.
-
 ## 변경 사항 확인만 하기
 
 실제 원격 파일을 바꾸지 않고 어떤 차이가 날지 확인합니다.
@@ -252,6 +261,7 @@ fleet inventory에서 특정 차량 하나만 다른 설정이 필요하면 `hos
 ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   -e odim_vpn_ip=10.8.0.11 \
   -e ssh_pass=dev \
+  -e initial_setup_config_set=v6_5 \
   --check --diff
 ```
 
@@ -262,6 +272,7 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   --limit odim \
   -e odim_vpn_ip=10.8.0.11 \
   -e ssh_pass=dev \
+  -e initial_setup_config_set=v6_5 \
   --check --diff
 ```
 
@@ -279,7 +290,8 @@ ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
 ```bash
 ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   -e odim_vpn_ip=10.8.0.11 \
-  -e ssh_pass=dev
+  -e ssh_pass=dev \
+  -e initial_setup_config_set=v6_5
 ```
 
 특정 장비만 적용:
@@ -288,7 +300,8 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
 ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   --limit odil \
   -e odim_vpn_ip=10.8.0.11 \
-  -e ssh_pass=dev
+  -e ssh_pass=dev \
+  -e initial_setup_config_set=v6_5
 ```
 
 ODIM IP 목록 inventory 전체 적용:
@@ -307,6 +320,7 @@ ansible-playbook -i inventory.ini deploy_initial_setup.yml \
   --limit odim \
   -e odim_vpn_ip=10.8.0.11 \
   -e ssh_pass=dev \
+  -e initial_setup_config_set=v6_5 \
   -e ansible_connection=local \
   -e initial_setup_dest=/tmp/initial_setup.odim.sh
 ```

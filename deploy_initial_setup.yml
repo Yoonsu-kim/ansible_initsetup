@@ -3,15 +3,23 @@
   gather_facts: false
 
   tasks:
+    - name: Validate config set selection
+      ansible.builtin.assert:
+        that:
+          - initial_setup_config_set is defined
+          - initial_setup_config_role is defined
+        fail_msg: >-
+          initial_setup_config_set and initial_setup_config_role are required.
+          Use inventory_odim_list.yml, or pass initial_setup_config_set and define
+          initial_setup_config_role per role in the inventory.
+
     - name: Load selected config set defaults
       ansible.builtin.include_vars:
         file: "config_sets/{{ initial_setup_config_set }}/all.yml"
-      when: initial_setup_config_set is defined
 
     - name: Load selected config set role overrides
       ansible.builtin.include_vars:
         file: "config_sets/{{ initial_setup_config_set }}/{{ initial_setup_config_role }}.yml"
-      when: initial_setup_config_set is defined
 
     - name: Build merged initial setup config
       ansible.builtin.set_fact:

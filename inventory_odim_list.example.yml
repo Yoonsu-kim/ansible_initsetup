@@ -15,10 +15,10 @@ all:
     odim_sets:
       car01:
         odim_ip: 10.8.0.11
-        config_set: group_vars
+        config_set: v6_5
       car02:
         odim_ip: 10.8.0.12
-        config_set: group_vars2
+        config_set: v6_5
       car03:
         odim_ip: 10.8.0.13
-        config_set: group_vars
+        config_set: v6_5
