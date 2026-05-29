@@ -1,0 +1,13 @@
+# Add only ODIL role-specific differences here.
+initial_setup_overrides: 
+  vlans:
+    "2":
+      enabled: true
+      ip: "192.168.9.102/24"
+    "32":
+      enabled: false
+    "33":
+      enabled: false
+  ptp:
+    enabled: true
+    use_exec: true

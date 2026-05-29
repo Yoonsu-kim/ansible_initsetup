@@ -1,0 +1,22 @@
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+  children:
+    initial_setup_targets:
+      children:
+        role_odim:
+        role_odil:
+        role_odic:
+  vars:
+    odil_inner_ip: 192.168.31.7
+    odic_inner_ip: 192.168.31.8
+
+    odim_sets:
+      target01:
+        odim_ip: 10.8.0.154
+        config_set: v6_5
+
+      target02:
+        odim_ip: 10.8.0.170
+        config_set: v6_5

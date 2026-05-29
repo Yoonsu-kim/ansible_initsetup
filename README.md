@@ -364,3 +364,57 @@ ssh odim 'ssh odic "bash -s -- /home/odin/initial_setup.sh" < ./inspect_initial_
 - `deploy_initial_setup.yml`을 `--check` 없이 실행하면 `initial_setup_dest` 경로의 파일을 생성 또는 갱신합니다.
 - list 형태 변수는 부분 overlay가 어렵기 때문에 VLAN, CAN, PTP 설정은 dict 형태로 관리합니다.
 - PTP는 기본값에서 `exec`를 사용하지 않도록 생성합니다. `exec ... &`를 여러 줄 쓰면 첫 번째 `exec`가 shell을 대체할 수 있어 의도와 다르게 동작할 수 있습니다.
+
+## 여러 target에 같은 config set 적용
+
+ODIM IP만 다른 여러 target에 같은 config set을 적용하려면 `inventory_odim_list.yml`의 `odim_sets` 아래에 target을 추가합니다.
+
+예: 모든 target이 `config_sets/v6_5/` 설정을 사용하는 경우
+
+```yaml
+odim_sets:
+  target01:
+    odim_ip: 10.8.0.154
+    config_set: v6_5
+
+  target02:
+    odim_ip: 10.8.0.170
+    config_set: v6_5
+
+  target03:
+    odim_ip: 10.8.0.171
+    config_set: v6_5
+```
+
+전체 target 적용:
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev
+```
+
+특정 target만 적용:
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev \
+  -e fleet_set=target02
+```
+
+여러 target만 선택 적용:
+
+```bash
+ansible-playbook -i inventory_odim_list.yml deploy_fleet_from_odim_list.yml \
+  -e ssh_pass=dev \
+  -e fleet_set=target01,target03
+```
+
+각 target은 같은 `config_sets/v6_5/` 설정을 쓰고, ODIM IP만 다르게 적용됩니다. 실행 중에는 target마다 ODIM/ODIL/ODIC host가 생성되고, 역할별로 다음 파일이 자동 적용됩니다.
+
+```text
+target01_odim -> config_sets/v6_5/role_odim.yml
+target01_odil -> config_sets/v6_5/role_odil.yml
+target01_odic -> config_sets/v6_5/role_odic.yml
+```
+
+공통 기본값은 `config_sets/v6_5/all.yml`에서 읽고, 각 장비 역할별 차이는 `role_odim.yml`, `role_odil.yml`, `role_odic.yml`에서 overlay합니다.
